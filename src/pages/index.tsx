@@ -1,9 +1,108 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import type { NextPage } from 'next';
-import Head from 'next/head';
-import styles from '../styles/Home.module.css';
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import type { NextPage } from "next";
+import Head from "next/head";
+import styles from "../styles/Home.module.css";
+import { FormEvent, useEffect, useState } from "react";
+import { translate } from "@vitalets/google-translate-api";
+import { useSendTransaction } from "wagmi";
 
 const Home: NextPage = () => {
+  const [history, setHistory] = useState([]);
+  const { sendTransaction } = useSendTransaction();
+
+  const translateText = async (message: string, languageTo: "en" | "es") => {
+    try {
+      const { text } = await translate(message, { to: languageTo });
+      return text;
+    } catch (ex: any) {
+      console.log("Error: ", ex.message);
+      return message;
+    }
+  };
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      const messages = event.target as HTMLFormElement;
+      const _message = (messages[0] as HTMLInputElement).value;
+      console.log({ _message });
+
+      const textUser = await translateText(_message, "en");
+
+      const request = await fetch("https://api.brianknows.org/api/v0/agent", {
+        method: "POST",
+        headers: {
+          "X-Brian-Api-Key": String(process.env.NEXT_PUBLIC_BRIAN_API_KEY),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: textUser,
+          address: "0x1D296037309fE717Ea755e11D399B792c3E130F3",
+          messages: history,
+          // messages: history == "" ? [] : JSON.parse(history),
+        }),
+      });
+
+      const response = await request.json();
+      const messageError = response.error;
+      console.log("Error: ", response.error);
+      let message = "";
+      if (messageError) {
+        console.log("Entre al mensaje");
+        message = await translateText(messageError, "es");
+        if (history.length == 0)
+          setHistory([
+            ...response?.conversationHistory,
+            { content: messageError, sender: "brian" },
+          ]);
+        else setHistory(response?.conversationHistory);
+      } else {
+        message = JSON.stringify(response);
+        if (response.result) {
+          for (const req of response.result) {
+            if (req.action == "transfer") {
+              console.log("Transfer token");
+              for (const step of req.data.steps!) {
+                try {
+                  //   const account = privateKeyToAccount(
+                  //     `0x${process.env.PRIVATE_KEY}`
+                  //   );
+                  console.log({
+                    to: step.to,
+                    value: BigInt(step.value),
+                    data: step.data,
+                  });
+                  sendTransaction({
+                    to: step.to,
+                    value: step.data,
+                  });
+                  //   const tx = await walletClient.sendTransaction({
+                  //     account: account,
+                  //     to: step.to,
+                  //     value: BigInt(step.value),
+                  //     data: step.data,
+                  //   });
+
+                  //   console.log(`Transaction for step ${step.chainId} sent:`, tx);
+                  //   // await publicClient.waitForTransactionReceipt({ hash: tx }); // Wait for the transaction to be mined
+                  //   console.log(`Transaction for step ${step.chainId} confirmed.`);
+                } catch (ex: any) {
+                  console.log("Fallé en la transacción");
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    console.log({ history });
+  }, [history]);
+
   return (
     <div className={styles.container}>
       <Head>
@@ -17,59 +116,24 @@ const Home: NextPage = () => {
 
       <main className={styles.main}>
         <ConnectButton />
+        <h1>Bienvenido al futuro con Agentes AI </h1>
 
-        <h1 className={styles.title}>
-          Welcome to <a href="">RainbowKit</a> + <a href="">wagmi</a> +{' '}
-          <a href="https://nextjs.org">Next.js!</a>
-        </h1>
+        <h2>Chat</h2>
 
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.tsx</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a className={styles.card} href="https://rainbowkit.com">
-            <h2>RainbowKit Documentation &rarr;</h2>
-            <p>Learn how to customize your wallet connection flow.</p>
-          </a>
-
-          <a className={styles.card} href="https://wagmi.sh">
-            <h2>wagmi Documentation &rarr;</h2>
-            <p>Learn how to interact with Ethereum.</p>
-          </a>
-
-          <a
-            className={styles.card}
-            href="https://github.com/rainbow-me/rainbowkit/tree/main/examples"
+        {history.map((el: { content: string; sender: string }) => (
+          <div
+            className={`${styles.message} ${
+              el.sender == "brian" ? styles.message_left : styles.message_rigth
+            }`}
           >
-            <h2>RainbowKit Examples &rarr;</h2>
-            <p>Discover boilerplate example RainbowKit projects.</p>
-          </a>
+            {el.content}
+          </div>
+        ))}
 
-          <a className={styles.card} href="https://nextjs.org/docs">
-            <h2>Next.js Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a
-            className={styles.card}
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-          >
-            <h2>Next.js Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            className={styles.card}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
+        <form onSubmit={onSubmit}>
+          <input type="text" name="name" />
+          <button type="submit">Enviar Mensaje</button>
+        </form>
       </main>
 
       <footer className={styles.footer}>

@@ -100,3 +100,18 @@
     flex-direction: column;
   }
 }
+
+.message {
+  display: flex;
+  width: 20rem;
+  border: 1px solid black;
+  margin: 1rem 0;
+}
+
+.message_left {
+  margin-right: 5rem;
+}
+
+.message_rigth {
+  margin-left: 5rem;
+}

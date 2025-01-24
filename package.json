@@ -10,11 +10,12 @@
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.2",
     "@tanstack/react-query": "^5.55.3",
+    "@vitalets/google-translate-api": "^9.2.0",
     "next": "^15.1.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "viem": "2.21.55",
-    "wagmi": "^2.14.7"
+    "wagmi": "^2.14.8"
   },
   "devDependencies": {
     "@types/node": "^20.14.8",
